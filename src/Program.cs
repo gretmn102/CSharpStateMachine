@@ -86,7 +86,8 @@ namespace App
 
     enum Action
     {
-        Toggle = 0
+        Toggle,
+        Input
     }
 
     class Counter
@@ -116,7 +117,7 @@ namespace App
 
     interface ICommand { }
 
-    struct PrintCommand : ICommand
+    class PrintCommand : ICommand
     {
         public string Text { get; set; }
 
@@ -126,15 +127,43 @@ namespace App
         }
     }
 
-    struct ReadLineCommand : ICommand
+    class ReadIntCommand : ICommand
     {
-        public Func<string> Result { get; set; }
-
+        public Func<int>? ReadInt { get; set; }
     }
 
     class TogglerWithCounter
     {
         public StateMachine<Action, Counter, ICommand> StateMachine { get; set; }
+
+        private static IEnumerator<ICommand> InputInitCounterHandler(Counter counter)
+        {
+            yield return new PrintCommand("Input init counter handler");
+
+            ReadIntCommand rlc = new();
+            yield return rlc;
+            counter.Accumulator = rlc.ReadInt switch
+            {
+                null => throw new Exception("ReadLine is null"),
+                _ => rlc.ReadInt(),
+            };
+        }
+
+        private static Node<Action, Counter, ICommand> CreateInputInitCounter(
+            Node<Action, Counter, ICommand> inactiveNode)
+        {
+            Transition<Action, Counter, ICommand> inputInitCounter = new(Action.Input)
+            {
+                Act = InputInitCounterHandler,
+                To = inactiveNode,
+            };
+
+            Node<Action, Counter, ICommand> inputInitCounterNode = new(
+                new Transition<Action, Counter, ICommand>[] { inputInitCounter }
+            );
+
+            return inputInitCounterNode;
+        }
 
         private static IEnumerator<ICommand> InactiveHandler(Counter counter)
         {
@@ -157,6 +186,24 @@ namespace App
                     case PrintCommand printCommand:
                         Console.WriteLine(printCommand.Text);
                         break;
+
+                    case ReadIntCommand readIntCommand:
+                        readIntCommand.ReadInt = () =>
+                        {
+                            string? input;
+                            while (true)
+                            {
+                                input = Console.ReadLine();
+                                if (int.TryParse(input, out int result))
+                                {
+                                    return result;
+                                }
+                            }
+                        };
+                        break;
+
+                    default:
+                        throw new Exception($"{commands.Current.GetType().FullName} not implemented yet");
                 }
             }
         }
@@ -185,9 +232,11 @@ namespace App
 
             active.To = inactiveNode;
 
+            var init = CreateInputInitCounter(inactiveNode);
+
             Counter counter = new(0);
 
-            StateMachine = new(inactiveNode, Interpret, counter);
+            StateMachine = new(init, Interpret, counter);
         }
     }
 
@@ -197,7 +246,7 @@ namespace App
         {
             TogglerWithCounter togglerWithCounter = new();
             var toggler = togglerWithCounter.StateMachine;
-            toggler.Do(Action.Toggle);
+            toggler.Do(Action.Input);
             toggler.Do(Action.Toggle);
             toggler.Do(Action.Toggle);
             toggler.Do(Action.Toggle);
