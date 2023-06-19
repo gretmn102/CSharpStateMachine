@@ -1,6 +1,6 @@
 namespace App
 {
-    class Transition<Action, Context, Command, NodeKey>
+    class Transition<NodeKey, Action, Context, Command>
         where Action : notnull
         where NodeKey : notnull
     {
@@ -16,17 +16,17 @@ namespace App
         }
     }
 
-    class Node<Action, Context, Command, NodeKey>
+    class Node<NodeKey, Action, Context, Command>
         where Action : notnull
         where NodeKey : notnull
     {
-        public Dictionary<Action, Transition<Action, Context, Command, NodeKey>> Transitions { get; set; }
+        public Dictionary<Action, Transition<NodeKey, Action, Context, Command>> Transitions { get; set; }
 
         public NodeKey Key { get; set; }
 
         public Node(
             NodeKey key,
-            Dictionary<Action, Transition<Action, Context, Command, NodeKey>> transitions)
+            Dictionary<Action, Transition<NodeKey, Action, Context, Command>> transitions)
         {
             Key = key;
             Transitions = transitions;
@@ -34,23 +34,23 @@ namespace App
 
         public Node(
             NodeKey name,
-            IEnumerable<Transition<Action, Context, Command, NodeKey>> transitions
-        ) : this(name, new Dictionary<Action, Transition<Action, Context, Command, NodeKey>>())
+            IEnumerable<Transition<NodeKey, Action, Context, Command>> transitions
+        ) : this(name, new Dictionary<Action, Transition<NodeKey, Action, Context, Command>>())
         {
-            Transitions = new Dictionary<Action, Transition<Action, Context, Command, NodeKey>>(
+            Transitions = new Dictionary<Action, Transition<NodeKey, Action, Context, Command>>(
                 transitions.Select(x =>
-                    new KeyValuePair<Action, Transition<Action, Context, Command, NodeKey>>(x.Key, x))
+                    new KeyValuePair<Action, Transition<NodeKey, Action, Context, Command>>(x.Key, x))
             );
         }
     }
 
-    class StateMachine<Action, Context, Command, NodeKey>
+    class StateMachine<NodeKey, Action, Context, Command>
         where Action : notnull
         where NodeKey : notnull
     {
-        private Dictionary<NodeKey, Node<Action, Context, Command, NodeKey>> _nodes;
+        private Dictionary<NodeKey, Node<NodeKey, Action, Context, Command>> _nodes;
 
-        public Dictionary<NodeKey, Node<Action, Context, Command, NodeKey>> Nodes
+        public Dictionary<NodeKey, Node<NodeKey, Action, Context, Command>> Nodes
         {
             get { return _nodes; }
             set
@@ -60,7 +60,7 @@ namespace App
             }
         }
 
-        Node<Action, Context, Command, NodeKey>? _currentNode;
+        Node<NodeKey, Action, Context, Command>? _currentNode;
 
         private NodeKey? _currentNodeKey;
 
@@ -85,7 +85,7 @@ namespace App
         public Action<IEnumerator<Command>> Interpret { get; set; }
 
         public StateMachine(
-            Dictionary<NodeKey, Node<Action, Context, Command, NodeKey>> nodes,
+            Dictionary<NodeKey, Node<NodeKey, Action, Context, Command>> nodes,
             NodeKey initNode,
             Action<IEnumerator<Command>> interpret,
             Context context)
@@ -98,15 +98,15 @@ namespace App
         }
 
         public StateMachine(
-            IEnumerable<Node<Action, Context, Command, NodeKey>> nodes,
+            IEnumerable<Node<NodeKey, Action, Context, Command>> nodes,
             NodeKey initNode,
             Action<IEnumerator<Command>> interpret,
             Context context
-        ) : this(new Dictionary<NodeKey, Node<Action, Context, Command, NodeKey>>(), initNode, interpret, context)
+        ) : this(new Dictionary<NodeKey, Node<NodeKey, Action, Context, Command>>(), initNode, interpret, context)
         {
-            Nodes = new Dictionary<NodeKey, Node<Action, Context, Command, NodeKey>>(
+            Nodes = new Dictionary<NodeKey, Node<NodeKey, Action, Context, Command>>(
                 nodes.Select(x =>
-                    new KeyValuePair<NodeKey, Node<Action, Context, Command, NodeKey>>(x.Key, x))
+                    new KeyValuePair<NodeKey, Node<NodeKey, Action, Context, Command>>(x.Key, x))
             );
         }
 
@@ -204,7 +204,7 @@ namespace App
 
     class TogglerWithCounter
     {
-        public StateMachine<Action, Counter, ICommand, NodeKey> StateMachine { get; set; }
+        public StateMachine<NodeKey, Action, Counter, ICommand> StateMachine { get; set; }
 
         private static IEnumerator<ICommand> InputInitCounterHandler(Counter counter)
         {
@@ -219,17 +219,17 @@ namespace App
             };
         }
 
-        private static Node<Action, Counter, ICommand, NodeKey> CreateInputInitCounter()
+        private static Node<NodeKey, Action, Counter, ICommand> CreateInputInitCounter()
         {
-            Transition<Action, Counter, ICommand, NodeKey> inputInitCounter = new(Action.Input)
+            Transition<NodeKey, Action, Counter, ICommand> inputInitCounter = new(Action.Input)
             {
                 Act = InputInitCounterHandler,
                 To = NodeKey.Inactive,
             };
 
-            Node<Action, Counter, ICommand, NodeKey> inputInitCounterNode = new(
+            Node<NodeKey, Action, Counter, ICommand> inputInitCounterNode = new(
                 NodeKey.InputInitCounter,
-                new Transition<Action, Counter, ICommand, NodeKey>[] { inputInitCounter }
+                new Transition<NodeKey, Action, Counter, ICommand>[] { inputInitCounter }
             );
 
             return inputInitCounterNode;
@@ -241,17 +241,17 @@ namespace App
             yield return new PrintCommand($"Inactive -> Active {counter} times");
         }
 
-        private static Node<Action, Counter, ICommand, NodeKey> CreateInactive()
+        private static Node<NodeKey, Action, Counter, ICommand> CreateInactive()
         {
-            Transition<Action, Counter, ICommand, NodeKey> inactive = new(Action.Toggle)
+            Transition<NodeKey, Action, Counter, ICommand> inactive = new(Action.Toggle)
             {
                 Act = InactiveHandler,
                 To = NodeKey.Active
             };
 
-            Node<Action, Counter, ICommand, NodeKey> inactiveNode = new(
+            Node<NodeKey, Action, Counter, ICommand> inactiveNode = new(
                 NodeKey.Inactive,
-                new Transition<Action, Counter, ICommand, NodeKey>[] { inactive }
+                new Transition<NodeKey, Action, Counter, ICommand>[] { inactive }
             );
             return inactiveNode;
         }
@@ -262,17 +262,17 @@ namespace App
             yield return new PrintCommand($"Active -> Inactive {counter} times");
         }
 
-        private static Node<Action, Counter, ICommand, NodeKey> CreateActive()
+        private static Node<NodeKey, Action, Counter, ICommand> CreateActive()
         {
-            Transition<Action, Counter, ICommand, NodeKey> active = new(Action.Toggle)
+            Transition<NodeKey, Action, Counter, ICommand> active = new(Action.Toggle)
             {
                 Act = ActiveHandler,
                 To = NodeKey.Inactive
             };
 
-            Node<Action, Counter, ICommand, NodeKey> activeNode = new(
+            Node<NodeKey, Action, Counter, ICommand> activeNode = new(
                 NodeKey.Active,
-                new Transition<Action, Counter, ICommand, NodeKey>[] { active }
+                new Transition<NodeKey, Action, Counter, ICommand>[] { active }
             );
             return activeNode;
         }
@@ -312,7 +312,7 @@ namespace App
         {
             var init = CreateInputInitCounter();
 
-            var nodes = new Node<Action, Counter, ICommand, NodeKey>[] {
+            var nodes = new Node<NodeKey, Action, Counter, ICommand>[] {
                 CreateInputInitCounter(),
                 CreateActive(),
                 CreateInactive(),
