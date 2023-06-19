@@ -1,151 +1,8 @@
 namespace App
 {
-    class Transition<NodeKey, Action, Context, Command>
-        where Action : notnull
-        where NodeKey : notnull
-    {
-        public Action Key { get; set; }
-
-        public NodeKey? To { get; set; }
-
-        public Func<Context, IEnumerator<Command>?>? Act { get; set; }
-
-        public Transition(Action key)
-        {
-            Key = key;
-        }
-    }
-
-    class Node<NodeKey, Action, Context, Command>
-        where Action : notnull
-        where NodeKey : notnull
-    {
-        public Dictionary<Action, Transition<NodeKey, Action, Context, Command>> Transitions { get; set; }
-
-        public NodeKey Key { get; set; }
-
-        public Node(
-            NodeKey key,
-            Dictionary<Action, Transition<NodeKey, Action, Context, Command>> transitions)
-        {
-            Key = key;
-            Transitions = transitions;
-        }
-
-        public Node(
-            NodeKey name,
-            IEnumerable<Transition<NodeKey, Action, Context, Command>> transitions
-        ) : this(name, new Dictionary<Action, Transition<NodeKey, Action, Context, Command>>())
-        {
-            Transitions = new Dictionary<Action, Transition<NodeKey, Action, Context, Command>>(
-                transitions.Select(x =>
-                    new KeyValuePair<Action, Transition<NodeKey, Action, Context, Command>>(x.Key, x))
-            );
-        }
-    }
-
-    class StateMachine<NodeKey, Action, Context, Command>
-        where Action : notnull
-        where NodeKey : notnull
-    {
-        private Dictionary<NodeKey, Node<NodeKey, Action, Context, Command>> _nodes;
-
-        public Dictionary<NodeKey, Node<NodeKey, Action, Context, Command>> Nodes
-        {
-            get { return _nodes; }
-            set
-            {
-                _nodes = value;
-                SetCurrentNodeKey(CurrentNodeKey);
-            }
-        }
-
-        Node<NodeKey, Action, Context, Command>? _currentNode;
-
-        private NodeKey? _currentNodeKey;
-
-        public void SetCurrentNodeKey(NodeKey? value)
-        {
-            _currentNodeKey = value;
-            if (value != null)
-            {
-                _nodes.TryGetValue(value, out var result);
-                _currentNode = result;
-            }
-        }
-
-        public NodeKey? CurrentNodeKey
-        {
-            get { return _currentNodeKey; }
-            set { SetCurrentNodeKey(value); }
-        }
-
-        public Context State { get; set; }
-
-        public Action<IEnumerator<Command>> Interpret { get; set; }
-
-        public StateMachine(
-            Dictionary<NodeKey, Node<NodeKey, Action, Context, Command>> nodes,
-            NodeKey initNode,
-            Action<IEnumerator<Command>> interpret,
-            Context context)
-        {
-            _nodes = nodes; // to avoid csharp(CS8618)
-            Nodes = nodes;
-            CurrentNodeKey = initNode;
-            Interpret = interpret;
-            State = context;
-        }
-
-        public StateMachine(
-            IEnumerable<Node<NodeKey, Action, Context, Command>> nodes,
-            NodeKey initNode,
-            Action<IEnumerator<Command>> interpret,
-            Context context
-        ) : this(new Dictionary<NodeKey, Node<NodeKey, Action, Context, Command>>(), initNode, interpret, context)
-        {
-            Nodes = new Dictionary<NodeKey, Node<NodeKey, Action, Context, Command>>(
-                nodes.Select(x =>
-                    new KeyValuePair<NodeKey, Node<NodeKey, Action, Context, Command>>(x.Key, x))
-            );
-        }
-
-        public void Do(Action action)
-        {
-            if (_currentNode == null)
-            {
-                throw new Exception($"_currentNode is null {action}");
-            }
-            else
-            {
-                if (!_currentNode.Transitions.TryGetValue(action, out var transition))
-                {
-                    throw new Exception($"Not found {action}");
-                }
-                else
-                {
-                    CurrentNodeKey = transition.To;
-                    var act = transition.Act;
-                    if (act == null)
-                    {
-                        return;
-                    }
-                    else
-                    {
-                        var res = act.Invoke(State);
-                        if (res == null)
-                        {
-                            return;
-                        }
-                        else
-                        {
-                            Interpret(res);
-                        }
-                    }
-                }
-            }
-        }
-    }
+    using Node = StateMachine.Node<NodeKey, Action, Counter, ICommand>;
+    using Transition = StateMachine.Transition<NodeKey, Action, Counter, ICommand>;
+    using Machine = StateMachine.Machine<NodeKey, Action, Counter, ICommand>;
 
     enum NodeKey
     {
@@ -204,7 +61,7 @@ namespace App
 
     class TogglerWithCounter
     {
-        public StateMachine<NodeKey, Action, Counter, ICommand> StateMachine { get; set; }
+        public Machine StateMachine { get; set; }
 
         private static IEnumerator<ICommand> InputInitCounterHandler(Counter counter)
         {
@@ -219,17 +76,17 @@ namespace App
             };
         }
 
-        private static Node<NodeKey, Action, Counter, ICommand> CreateInputInitCounter()
+        private static Node CreateInputInitCounter()
         {
-            Transition<NodeKey, Action, Counter, ICommand> inputInitCounter = new(Action.Input)
+            Transition inputInitCounter = new(Action.Input)
             {
                 Act = InputInitCounterHandler,
                 To = NodeKey.Inactive,
             };
 
-            Node<NodeKey, Action, Counter, ICommand> inputInitCounterNode = new(
+            Node inputInitCounterNode = new(
                 NodeKey.InputInitCounter,
-                new Transition<NodeKey, Action, Counter, ICommand>[] { inputInitCounter }
+                new Transition[] { inputInitCounter }
             );
 
             return inputInitCounterNode;
@@ -241,17 +98,17 @@ namespace App
             yield return new PrintCommand($"Inactive -> Active {counter} times");
         }
 
-        private static Node<NodeKey, Action, Counter, ICommand> CreateInactive()
+        private static Node CreateInactive()
         {
-            Transition<NodeKey, Action, Counter, ICommand> inactive = new(Action.Toggle)
+            Transition inactive = new(Action.Toggle)
             {
                 Act = InactiveHandler,
                 To = NodeKey.Active
             };
 
-            Node<NodeKey, Action, Counter, ICommand> inactiveNode = new(
+            Node inactiveNode = new(
                 NodeKey.Inactive,
-                new Transition<NodeKey, Action, Counter, ICommand>[] { inactive }
+                new Transition[] { inactive }
             );
             return inactiveNode;
         }
@@ -262,17 +119,17 @@ namespace App
             yield return new PrintCommand($"Active -> Inactive {counter} times");
         }
 
-        private static Node<NodeKey, Action, Counter, ICommand> CreateActive()
+        private static Node CreateActive()
         {
-            Transition<NodeKey, Action, Counter, ICommand> active = new(Action.Toggle)
+            Transition active = new(Action.Toggle)
             {
                 Act = ActiveHandler,
                 To = NodeKey.Inactive
             };
 
-            Node<NodeKey, Action, Counter, ICommand> activeNode = new(
+            Node activeNode = new(
                 NodeKey.Active,
-                new Transition<NodeKey, Action, Counter, ICommand>[] { active }
+                new Transition[] { active }
             );
             return activeNode;
         }
@@ -312,7 +169,7 @@ namespace App
         {
             var init = CreateInputInitCounter();
 
-            var nodes = new Node<NodeKey, Action, Counter, ICommand>[] {
+            var nodes = new Node[] {
                 CreateInputInitCounter(),
                 CreateActive(),
                 CreateInactive(),
